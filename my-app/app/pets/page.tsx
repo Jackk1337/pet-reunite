@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,6 +24,11 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
+import {
+  GoogleMap,
+  Marker,
+  useJsApiLoader,
+} from "@react-google-maps/api";
 
 export default function PetsPage() {
   const [showForm, setShowForm] = useState(false);
@@ -35,7 +40,30 @@ export default function PetsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingPets, setIsFetchingPets] = useState(false);
+  const [showMissingModal, setShowMissingModal] = useState(false);
+  const [reportingPet, setReportingPet] = useState<any | null>(null);
+  const [missingDate, setMissingDate] = useState("");
+  const [missingTime, setMissingTime] = useState("");
+  const [missingNotes, setMissingNotes] = useState("");
+  const [notifyVet, setNotifyVet] = useState(false);
+  const [notifyShelters, setNotifyShelters] = useState(false);
+  const [markerPosition, setMarkerPosition] = useState<
+    google.maps.LatLngLiteral | null
+  >(null);
+  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>({
+    lat: 39.8097343,
+    lng: -98.5556199,
+  });
+  const [isSavingMissingReport, setIsSavingMissingReport] = useState(false);
+  const [showReunitedModal, setShowReunitedModal] = useState(false);
+  const [petBeingReunited, setPetBeingReunited] = useState<any | null>(null);
+  const [isSavingReunited, setIsSavingReunited] = useState(false);
   const router = useRouter();
+  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const { isLoaded } = useJsApiLoader({
+    id: "pet-reunite-maps",
+    googleMapsApiKey: googleMapsApiKey ?? "",
+  });
 
   // Fetch pets from Firestore
   const fetchPets = async (userId: string) => {
@@ -179,6 +207,162 @@ export default function PetsPage() {
     }
   };
 
+  const handleReportMissing = (pet: any) => {
+    setReportingPet(pet);
+    setMissingDate(new Date().toISOString().split("T")[0]);
+    setMissingTime("");
+    setMissingNotes("");
+
+    if (pet?.LatLong?.latitude && pet?.LatLong?.longitude) {
+      const existingLocation = {
+        lat: pet.LatLong.latitude,
+        lng: pet.LatLong.longitude,
+      };
+      setMarkerPosition(existingLocation);
+      setMapCenter(existingLocation);
+    } else {
+      setMarkerPosition(null);
+      setMapCenter({
+        lat: 39.8097343,
+        lng: -98.5556199,
+      });
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+          const currentLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setMarkerPosition(currentLocation);
+          setMapCenter(currentLocation);
+        });
+      }
+    }
+
+    setShowMissingModal(true);
+  };
+
+  const resetMissingState = () => {
+    setReportingPet(null);
+    setMissingDate("");
+    setMissingTime("");
+    setMissingNotes("");
+    setNotifyVet(false);
+    setNotifyShelters(false);
+    setMarkerPosition(null);
+  };
+
+  const handleMissingOpenChange = (open: boolean) => {
+    setShowMissingModal(open);
+    if (!open) {
+      resetMissingState();
+    }
+  };
+
+  const handleMapInteraction = useCallback(
+    (event: google.maps.MapMouseEvent) => {
+      if (event.latLng) {
+        const newPosition = {
+          lat: event.latLng.lat(),
+          lng: event.latLng.lng(),
+        };
+        setMarkerPosition(newPosition);
+        setMapCenter(newPosition);
+      }
+    },
+    []
+  );
+
+  const handleSaveMissingReport = async () => {
+    if (!user || !reportingPet) {
+      alert("You must be logged in to report a missing pet.");
+      return;
+    }
+
+    if (!markerPosition) {
+      alert("Please select an approximate location on the map.");
+      return;
+    }
+
+    if (!missingDate || !missingTime) {
+      alert("Please provide the date and approximate time the pet was lost.");
+      return;
+    }
+
+    setIsSavingMissingReport(true);
+    try {
+      const lostLatLong = {
+        latitude: markerPosition.lat,
+        longitude: markerPosition.lng,
+      };
+
+      const petRef = doc(db, "pets", reportingPet.id);
+      await updateDoc(petRef, {
+        isMissing: true,
+        LatLong: lostLatLong,
+        missingReport: {
+          lostDate: missingDate,
+          lostTime: missingTime,
+          notes: missingNotes,
+          location: lostLatLong,
+          reportedAt: new Date().toISOString(),
+        },
+      });
+
+      await fetchPets(user.uid);
+      handleMissingOpenChange(false);
+    } catch (error) {
+      console.error("Error reporting missing pet:", error);
+      alert("Failed to save missing report. Please try again.");
+    } finally {
+      setIsSavingMissingReport(false);
+    }
+  };
+
+  const handleMarkReunited = (pet: any) => {
+    if (!user) {
+      alert("You must be logged in to update your pet status.");
+      return;
+    }
+    setPetBeingReunited(pet);
+    setShowReunitedModal(true);
+  };
+
+  const handleConfirmReunited = async (helped: boolean) => {
+    if (!user || !petBeingReunited) {
+      alert("Unable to record reunion. Please try again.");
+      return;
+    }
+
+    setIsSavingReunited(true);
+    try {
+      const petRef = doc(db, "pets", petBeingReunited.id);
+      await updateDoc(petRef, {
+        isMissing: false,
+        reunitedFeedback: helped,
+        missingReport: {
+          ...(petBeingReunited.missingReport || {}),
+          reunitedAt: new Date().toISOString(),
+          petReuniteHelped: helped,
+        },
+      });
+      await fetchPets(user.uid);
+      setShowReunitedModal(false);
+      setPetBeingReunited(null);
+    } catch (error) {
+      console.error("Error updating pet status:", error);
+      alert("Failed to update pet status. Please try again.");
+    } finally {
+      setIsSavingReunited(false);
+    }
+  };
+
+  const handleReunitedOpenChange = (open: boolean) => {
+    setShowReunitedModal(open);
+    if (!open) {
+      setPetBeingReunited(null);
+    }
+  };
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f9f9fa" }}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -213,7 +397,12 @@ export default function PetsPage() {
                     Create Pet Profile
                   </Button>
                 </div>
-                <PetProfileList pets={pets} onEdit={handleEditPet} />
+                <PetProfileList
+                  pets={pets}
+                  onEdit={handleEditPet}
+                  onReportMissing={handleReportMissing}
+                  onMarkReunited={handleMarkReunited}
+                />
               </div>
             ) : (
               <Card className="p-12 text-center shadow-lg">
@@ -255,6 +444,156 @@ export default function PetsPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Missing Pet Modal */}
+        <Dialog open={showMissingModal} onOpenChange={handleMissingOpenChange}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                Report {reportingPet?.name || "pet"} as Missing
+              </DialogTitle>
+              <DialogDescription>
+                Share the last known location and additional details to alert the
+                community.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">
+                  Approximate location
+                </p>
+                <div className="h-72 rounded-lg overflow-hidden border border-gray-200">
+                  {!googleMapsApiKey ? (
+                    <div className="flex h-full flex-col items-center justify-center px-6 text-center text-sm text-gray-600">
+                      Add <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> to your
+                      environment to enable map reporting.
+                    </div>
+                  ) : isLoaded ? (
+                    <GoogleMap
+                      mapContainerStyle={{ width: "100%", height: "100%" }}
+                      center={markerPosition || mapCenter}
+                      zoom={13}
+                      onClick={handleMapInteraction}
+                      options={{
+                        disableDefaultUI: true,
+                        zoomControl: true,
+                      }}
+                    >
+                      {markerPosition && (
+                        <Marker
+                          position={markerPosition}
+                          draggable
+                          onDragEnd={handleMapInteraction}
+                        />
+                      )}
+                    </GoogleMap>
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-gray-500">
+                      Loading map...
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Drag the pin to where your pet was last seen. We’ll store the
+                  latitude and longitude to share with searchers.
+                </p>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="flex flex-col">
+                  <label
+                    htmlFor="lost-date"
+                    className="text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Date pet was lost
+                  </label>
+                  <input
+                    id="lost-date"
+                    type="date"
+                    value={missingDate}
+                    onChange={(e) => setMissingDate(e.target.value)}
+                    className="rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label
+                    htmlFor="lost-time"
+                    className="text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Approx. time pet was lost
+                  </label>
+                  <input
+                    id="lost-time"
+                    type="time"
+                    value={missingTime}
+                    onChange={(e) => setMissingTime(e.target.value)}
+                    className="rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <label
+                  htmlFor="lost-notes"
+                  className="text-sm font-medium text-gray-700 mb-1"
+                >
+                  Other information
+                </label>
+                <textarea
+                  id="lost-notes"
+                  value={missingNotes}
+                  onChange={(e) => setMissingNotes(e.target.value)}
+                  rows={4}
+                  placeholder="Describe what happened, what your pet was wearing, or anything that can help searchers."
+                  className="rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                />
+              </div>
+              <div className="space-y-3 rounded-lg border border-gray-200 p-4">
+                <label className="text-sm font-semibold text-gray-800">
+                  Notifications
+                </label>
+                <label className="flex items-start gap-3 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+                    checked={notifyVet}
+                    onChange={(e) => setNotifyVet(e.target.checked)}
+                  />
+                  <span>Do you want to alert your vet that your pet is lost?</span>
+                </label>
+                <label className="flex items-start gap-3 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+                    checked={notifyShelters}
+                    onChange={(e) => setNotifyShelters(e.target.checked)}
+                  />
+                  <span>
+                    Do you want to let local animal shelters know your pet is lost?
+                  </span>
+                </label>
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => handleMissingOpenChange(false)}
+                  disabled={isSavingMissingReport}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-red-600 text-white hover:bg-red-700"
+                  onClick={handleSaveMissingReport}
+                  disabled={isSavingMissingReport || !googleMapsApiKey}
+                >
+                  {isSavingMissingReport
+                    ? "Saving..."
+                    : !googleMapsApiKey
+                      ? "Enable Maps to Report"
+                      : "Report Missing"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Edit Pet Modal */}
         <Dialog open={showEditForm} onOpenChange={handleEditOpenChange}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -288,6 +627,34 @@ export default function PetsPage() {
                 Updating pet in database...
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Reunited Feedback Modal */}
+        <Dialog open={showReunitedModal} onOpenChange={handleReunitedOpenChange}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>That's great that you found your pet!</DialogTitle>
+              <DialogDescription>
+                Did PetReunite help you find your pet?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-6 flex flex-col gap-4">
+              <Button
+                disabled={isSavingReunited}
+                className="bg-green-600 text-white hover:bg-green-700"
+                onClick={() => handleConfirmReunited(true)}
+              >
+                Yes
+              </Button>
+              <Button
+                variant="outline"
+                disabled={isSavingReunited}
+                onClick={() => handleConfirmReunited(false)}
+              >
+                No
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

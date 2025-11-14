@@ -14,14 +14,22 @@ interface Pet {
   microchip?: string;
   image?: string;
   qrCode?: string;
+  isMissing?: boolean;
 }
 
 interface PetProfileListProps {
   pets: Pet[];
   onEdit?: (pet: Pet) => void;
+  onReportMissing?: (pet: Pet) => void;
+  onMarkReunited?: (pet: Pet) => void;
 }
 
-export function PetProfileList({ pets, onEdit }: PetProfileListProps) {
+export function PetProfileList({
+  pets,
+  onEdit,
+  onReportMissing,
+  onMarkReunited,
+}: PetProfileListProps) {
   return (
     <div className="grid gap-6">
       {pets.map((pet) => (
@@ -29,6 +37,11 @@ export function PetProfileList({ pets, onEdit }: PetProfileListProps) {
           key={pet.id}
           className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow"
         >
+          {pet.isMissing && (
+            <div className="bg-red-50 px-6 py-2 text-sm font-semibold text-red-700 border-b border-red-100 flex items-center gap-2">
+              <span>🚨 Missing Pet Alert</span>
+            </div>
+          )}
           <div className="grid sm:grid-cols-4 gap-6 p-6">
             {/* Pet Image - Clickable */}
             <Link
@@ -107,17 +120,29 @@ export function PetProfileList({ pets, onEdit }: PetProfileListProps) {
 
             {/* Actions */}
             <div className="sm:col-span-1 flex flex-col gap-2 justify-center">
-              <Button
-                variant="outline"
-                className="border-gray-300 bg-transparent"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onEdit && onEdit(pet);
-                }}
-              >
-                My pet is lost
-              </Button>
+              {pet.isMissing ? (
+                <Button
+                  className="bg-green-600 text-white hover:bg-green-700"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onMarkReunited && onMarkReunited(pet);
+                  }}
+                >
+                  ✅ Reunited
+                </Button>
+              ) : (
+                <Button
+                  className="bg-red-600 text-white hover:bg-red-700"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onReportMissing && onReportMissing(pet);
+                  }}
+                >
+                  🚨 My pet is lost
+                </Button>
+              )}
               <Button
                 variant="outline"
                 className="border-gray-300 bg-transparent"
