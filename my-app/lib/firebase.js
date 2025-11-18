@@ -16,7 +16,7 @@ const firebaseConfig = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "lost-pet-6de39",
   storageBucket:
     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-    "lost-pet-6de39.firebasestorage.app",
+    "lost-pet-6de39.appspot.com",
   messagingSenderId:
     process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "173172390932",
   appId:

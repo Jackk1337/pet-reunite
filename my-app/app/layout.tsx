@@ -10,9 +10,9 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
-  generator: "v0.app",
+  title: "PetReunite.io",
+  description: "PetReunite.io helps reunite lost pets faster with smart QR tags, missing posters, and real-time community alerts.",
+  generator: "PetReunite.io",
   icons: {
     icon: [
       {

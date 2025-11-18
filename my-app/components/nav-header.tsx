@@ -73,24 +73,6 @@ export function NavHeader() {
               Home
             </Link>
             <Link
-              href="/missing-pets"
-              className="text-gray-700 transition"
-              style={{ '--hover-color': '#ffb067' } as React.CSSProperties}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#ffb067'}
-              onMouseLeave={(e) => e.currentTarget.style.color = ''}
-            >
-              Missing Pets
-            </Link>
-            <Link
-              href="/shop"
-              className="text-gray-700 transition"
-              style={{ '--hover-color': '#ffb067' } as React.CSSProperties}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#ffb067'}
-              onMouseLeave={(e) => e.currentTarget.style.color = ''}
-            >
-              Shop
-            </Link>
-            <Link
               href="/#pricing"
               className="text-gray-700 transition"
               style={{ '--hover-color': '#ffb067' } as React.CSSProperties}
@@ -98,6 +80,15 @@ export function NavHeader() {
               onMouseLeave={(e) => e.currentTarget.style.color = ''}
             >
               Pricing
+            </Link>
+            <Link
+              href="/missing-pets"
+              className="text-gray-700 transition"
+              style={{ '--hover-color': '#ffb067' } as React.CSSProperties}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#ffb067'}
+              onMouseLeave={(e) => e.currentTarget.style.color = ''}
+            >
+              Missing Pets
             </Link>
             <div className="flex gap-3 items-center">
               {user ? (
@@ -164,7 +155,7 @@ export function NavHeader() {
                     <Link href="/login">Log In</Link>
                   </Button>
                   <Button asChild style={{ backgroundColor: '#ffb067' }} className="hover:opacity-90">
-                    <Link href="/register">Get Started</Link>
+                    <Link href="/#pricing">Get Started</Link>
                   </Button>
                 </>
               )}
@@ -206,16 +197,16 @@ export function NavHeader() {
               Home
             </Link>
             <Link
-              href="/shop"
+              href="/missing-pets"
               className="block text-gray-700 transition py-2"
               style={{ '--hover-color': '#ffb067' } as React.CSSProperties}
               onMouseEnter={(e) => e.currentTarget.style.color = '#ffb067'}
               onMouseLeave={(e) => e.currentTarget.style.color = ''}
             >
-              Shop
+              Missing Pets
             </Link>
-                <Link
-                  href="/#pricing"
+            <Link
+              href="/#pricing"
               className="block text-gray-700 transition py-2"
               style={{ '--hover-color': '#ffb067' } as React.CSSProperties}
               onMouseEnter={(e) => e.currentTarget.style.color = '#ffb067'}
@@ -268,7 +259,7 @@ export function NavHeader() {
                   className="w-full hover:opacity-90"
                   style={{ backgroundColor: '#ffb067' }}
                 >
-                  <Link href="/register">Get Started</Link>
+                  <Link href="/#pricing">Get Started</Link>
                 </Button>
               </>
             )}

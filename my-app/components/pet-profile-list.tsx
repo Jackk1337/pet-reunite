@@ -15,6 +15,15 @@ interface Pet {
   image?: string;
   qrCode?: string;
   isMissing?: boolean;
+  missingReport?: {
+    lostDate?: string;
+    lostTime?: string;
+    notes?: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+    };
+  };
 }
 
 interface PetProfileListProps {
@@ -22,6 +31,9 @@ interface PetProfileListProps {
   onEdit?: (pet: Pet) => void;
   onReportMissing?: (pet: Pet) => void;
   onMarkReunited?: (pet: Pet) => void;
+  onGeneratePosters?: (pet: Pet) => void;
+  onDelete?: (pet: Pet) => void;
+  onShowQr?: (pet: Pet) => void;
 }
 
 export function PetProfileList({
@@ -29,6 +41,9 @@ export function PetProfileList({
   onEdit,
   onReportMissing,
   onMarkReunited,
+  onGeneratePosters,
+  onDelete,
+  onShowQr,
 }: PetProfileListProps) {
   return (
     <div className="grid gap-6">
@@ -143,6 +158,30 @@ export function PetProfileList({
                   🚨 My pet is lost
                 </Button>
               )}
+              {pet.isMissing && (
+                <Button
+                  variant="outline"
+                  className="border-yellow-400 text-yellow-700 hover:bg-yellow-50 bg-transparent"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onGeneratePosters && onGeneratePosters(pet);
+                  }}
+                >
+                  Generate Missing Posters
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                className="border-blue-200 text-blue-700 hover:bg-blue-50 bg-transparent"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onShowQr && onShowQr(pet);
+                }}
+              >
+                Generate QR Code
+              </Button>
               <Button
                 variant="outline"
                 className="border-gray-300 bg-transparent"
@@ -153,6 +192,17 @@ export function PetProfileList({
                 }}
               >
                 Edit
+              </Button>
+              <Button
+                variant="outline"
+                className="border-red-200 text-red-600 hover:bg-red-50"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onDelete && onDelete(pet);
+                }}
+              >
+                Delete
               </Button>
             </div>
           </div>

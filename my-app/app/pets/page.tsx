@@ -20,6 +20,7 @@ import {
   addDoc,
   doc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   getDocs,
@@ -58,6 +59,13 @@ export default function PetsPage() {
   const [showReunitedModal, setShowReunitedModal] = useState(false);
   const [petBeingReunited, setPetBeingReunited] = useState<any | null>(null);
   const [isSavingReunited, setIsSavingReunited] = useState(false);
+  const [posterPet, setPosterPet] = useState<any | null>(null);
+  const [showPosterModal, setShowPosterModal] = useState(false);
+  const [qrPet, setQrPet] = useState<any | null>(null);
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [petToDelete, setPetToDelete] = useState<any | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded } = useJsApiLoader({
@@ -356,10 +364,146 @@ export default function PetsPage() {
     }
   };
 
+  const handleGeneratePosters = (pet: any) => {
+    setPosterPet(pet);
+    setShowPosterModal(true);
+  };
+
+  const handlePosterOpenChange = (open: boolean) => {
+    setShowPosterModal(open);
+    if (!open) {
+      setPosterPet(null);
+    }
+  };
+
+  const handleShowQrModal = (pet: any) => {
+    setQrPet(pet);
+    setShowQrModal(true);
+  };
+
+  const handleDownloadQr = () => {
+    if (!qrPet) return;
+    const link = document.createElement("a");
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
+      `https://petreunite.io/pet/${qrPet.qrCode || qrPet.id}`
+    )}`;
+    link.href = qrUrl;
+    link.download = `${qrPet.name || "pet"}-qr-code.png`;
+    link.click();
+  };
+
+  const handleDownloadPoster = () => {
+    if (!posterPet) return;
+
+    const lostDateTime = (() => {
+      const date = posterPet?.missingReport?.lostDate;
+      if (!date) return "Unknown";
+      const time = posterPet?.missingReport?.lostTime || "00:00";
+      const parsed = new Date(`${date}T${time}`);
+      if (Number.isNaN(parsed.getTime())) {
+        return date;
+      }
+      return parsed.toLocaleString();
+    })();
+
+    const imageBlock = posterPet?.image
+      ? `<img src="${posterPet.image}" alt="${posterPet.name}" style="width:100%;height:320px;object-fit:cover;border-radius:16px;margin-bottom:16px;" />`
+      : `<div style="width:100%;height:320px;border-radius:16px;background:#ffe6d2;display:flex;align-items:center;justify-content:center;font-size:72px;margin-bottom:16px;">🐾</div>`;
+
+    const printableHtml = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Missing Poster - ${posterPet.name}</title>
+    <style>
+      body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 32px; background: #f7f7f7; }
+      .poster { max-width: 640px; margin: 0 auto; background: #fff; border-radius: 24px; padding: 32px; box-shadow: 0 15px 35px rgba(0,0,0,0.15); }
+      .banner { text-align: center; font-size: 42px; letter-spacing: 2px; font-weight: 800; color: #c2410c; margin-bottom: 24px; }
+      .name { text-align: center; font-size: 36px; font-weight: 700; margin-bottom: 8px; color: #111827; }
+      .badge { display: inline-flex; align-items: center; gap: 6px; background: #fee2e2; color: #b91c1c; padding: 6px 14px; border-radius: 999px; font-weight: 600; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+      .grid div { background: #f9fafb; border-radius: 12px; padding: 12px; }
+      .label { font-size: 12px; text-transform: uppercase; color: #6b7280; letter-spacing: 0.08em; margin-bottom: 4px; }
+      .value { font-size: 16px; color: #111827; font-weight: 600; }
+      .qr-card { display:flex; align-items:center; gap:16px; background:linear-gradient(135deg,#fff7ed,#fffbeb); border-radius:16px; padding:16px; margin-top:12px; border:1px solid #fed7aa; box-shadow: inset 0 1px 0 rgba(255,255,255,0.6); }
+      .qr-card img { width:110px; height:110px; border-radius:12px; border:1px dashed #f59e0b; background:#fff; padding:8px; }
+      .qr-text { font-size:15px; color:#92400e; font-weight:600; line-height:1.4; }
+    </style>
+  </head>
+  <body>
+    <div class="poster">
+      <div class="banner">MISSING PET</div>
+      <div style="width:100%;height:320px;border-radius:16px;overflow:hidden;margin-bottom:16px;background:#ffe6d2;display:flex;align-items:center;justify-content:center;">
+        ${
+          posterPet?.image
+            ? `<img src="${posterPet.image}" alt="${posterPet.name}" style="max-width:100%;max-height:100%;object-fit:contain;" />`
+            : `<span style="font-size:72px;">🐾</span>`
+        }
+      </div>
+      <div class="name">${posterPet.name}</div>
+      <div style="text-align:center;margin-bottom:24px;">
+        <span class="badge">Lost • ${lostDateTime}</span>
+      </div>
+      <div class="grid">
+        <div>
+          <div class="label">Breed</div>
+          <div class="value">${posterPet.breed || "Unknown"}</div>
+        </div>
+        <div>
+          <div class="label">Color</div>
+          <div class="value">${posterPet.color || "Unknown"}</div>
+        </div>
+      </div>
+      <div class="qr-card" style="page-break-inside: avoid;">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+          `https://petreunite.io/pet/${posterPet.qrCode || posterPet.id}`
+        )}" alt="QR code" />
+        <p class="qr-text">Please scan this QR code to view the owner's contact details.</p>
+      </div>
+      <div style="text-align:center;margin-top:20px;font-size:14px;font-weight:600;color:#9a3412;">
+        PetReunite.io
+      </div>
+    </div>
+    <script>
+      window.onload = function() {
+        window.print();
+      };
+    </script>
+  </body>
+</html>`;
+
+    const printWindow = window.open("", "_blank", "width=900,height=1200");
+    if (printWindow) {
+      printWindow.document.write(printableHtml);
+      printWindow.document.close();
+    } else {
+      alert("Please allow pop-ups to download the missing poster.");
+    }
+  };
+
   const handleReunitedOpenChange = (open: boolean) => {
     setShowReunitedModal(open);
     if (!open) {
       setPetBeingReunited(null);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!user || !petToDelete) {
+      alert("Unable to delete pet. Please try again.");
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, "pets", petToDelete.id));
+      await fetchPets(user.uid);
+      setShowDeleteModal(false);
+      setPetToDelete(null);
+    } catch (error) {
+      console.error("Error deleting pet:", error);
+      alert("Failed to delete pet. Please try again.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -402,6 +546,12 @@ export default function PetsPage() {
                   onEdit={handleEditPet}
                   onReportMissing={handleReportMissing}
                   onMarkReunited={handleMarkReunited}
+                  onGeneratePosters={handleGeneratePosters}
+                  onDelete={(pet) => {
+                    setPetToDelete(pet);
+                    setShowDeleteModal(true);
+                  }}
+                  onShowQr={handleShowQrModal}
                 />
               </div>
             ) : (
@@ -439,6 +589,75 @@ export default function PetsPage() {
             {isLoading && (
               <div className="mt-4 text-center text-sm text-gray-600">
                 Saving pet to database...
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Missing Poster Modal */}
+        <Dialog open={showPosterModal} onOpenChange={handlePosterOpenChange}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                Generate Missing Posters
+              </DialogTitle>
+              <DialogDescription>
+                Print or download posters to share in your community.
+              </DialogDescription>
+            </DialogHeader>
+            {posterPet && (
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-dashed border-orange-200 bg-orange-50/60 p-4">
+                  <p className="text-sm text-orange-800">
+                    We’ll create a high-resolution, print-friendly poster with your pet’s latest photo and missing details. You can
+                    print directly or save as PDF.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 p-6 bg-white space-y-4">
+                  <div className="text-center">
+                    <p className="text-xs font-semibold uppercase tracking-[0.3em] text-red-500">Missing Pet</p>
+                    <h3 className="text-3xl font-bold text-gray-900">{posterPet.name}</h3>
+                    <p className="text-sm text-gray-500">
+                      Lost {posterPet?.missingReport?.lostDate || "Date unknown"}
+                      {posterPet?.missingReport?.lostTime ? ` at ${posterPet.missingReport.lostTime}` : ""}
+                    </p>
+                  </div>
+                <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-700">
+                    <div>
+                      <p className="font-semibold text-gray-900">Breed</p>
+                      <p>{posterPet.breed || "Unknown"}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Color / Markings</p>
+                      <p>{posterPet.color || "Unknown"}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Microchip</p>
+                      <p>{posterPet.microchip || "Not provided"}</p>
+                    </div>
+                  </div>
+                <div className="rounded-2xl bg-gradient-to-r from-orange-50 to-yellow-50 p-4 border border-orange-100 flex flex-col sm:flex-row items-center gap-3 shadow-inner">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                      `https://petreunite.io/pet/${posterPet.qrCode || posterPet.id}`
+                    )}`}
+                    alt="QR code"
+                    className="w-28 h-28 rounded-xl border-2 border-dashed border-orange-200 bg-white p-2"
+                  />
+                  <div className="text-sm text-gray-700">
+                    <p className="font-semibold text-gray-900 mb-1">Share owner details</p>
+                    <p>Please scan this QR code to view owner's contact information and the live pet profile.</p>
+                  </div>
+                </div>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <Button variant="outline" onClick={() => handlePosterOpenChange(false)}>
+                    Close
+                  </Button>
+                  <Button className="bg-yellow-500 text-white hover:bg-yellow-600" onClick={handleDownloadPoster}>
+                    Download printable poster
+                  </Button>
+                </div>
               </div>
             )}
           </DialogContent>
@@ -655,6 +874,70 @@ export default function PetsPage() {
                 No
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Pet Modal */}
+        <Dialog open={showDeleteModal} onOpenChange={(open) => {
+          setShowDeleteModal(open);
+          if (!open) {
+            setPetToDelete(null);
+          }
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Delete pet profile</DialogTitle>
+              <DialogDescription>
+                This will remove {petToDelete?.name || "this pet"} and all related data from your account.
+              </DialogDescription>
+            </DialogHeader>
+            <p className="text-sm text-gray-600">
+              This action cannot be undone. Are you sure you want to delete this pet?
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>
+                Cancel
+              </Button>
+              <Button className="bg-red-600 text-white hover:bg-red-700" onClick={handleConfirmDelete} disabled={isDeleting}>
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* QR Code Modal */}
+        <Dialog open={showQrModal} onOpenChange={(open) => {
+          setShowQrModal(open);
+          if (!open) {
+            setQrPet(null);
+          }
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Pet QR Code</DialogTitle>
+              <DialogDescription>
+                Scan to open {qrPet?.name || "this pet"}’s profile instantly.
+              </DialogDescription>
+            </DialogHeader>
+            {qrPet ? (
+              <div className="flex flex-col items-center gap-4">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(
+                    `https://petreunite.io/pet/${qrPet.qrCode || qrPet.id}`
+                  )}`}
+                  alt="Pet QR code"
+                  className="w-60 h-60 rounded-2xl border border-gray-200 p-4 bg-white"
+                />
+                <p className="text-sm text-gray-600 text-center">
+                  Point your camera at the QR code to view the live profile.
+                </p>
+                <Button className="bg-blue-600 text-white hover:bg-blue-700" onClick={handleDownloadQr}>
+                  Download QR code
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600">Select a pet to generate a QR code.</p>
+            )}
           </DialogContent>
         </Dialog>
       </div>

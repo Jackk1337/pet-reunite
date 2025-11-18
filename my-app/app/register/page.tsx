@@ -1,45 +1,121 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import Link from "next/link"
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
+import Link from "next/link";
+import { useState, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { auth, googleProvider, db } from "@/lib/firebase";
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  signInWithPopup,
+} from "firebase/auth";
+import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedPlan = searchParams.get("plan");
+  const skipTagOnboarding = selectedPlan === "free";
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     password: "",
     confirmPassword: "",
-  })
-  const [isLoading, setIsLoading] = useState(false)
-  const [passwordMatch, setPasswordMatch] = useState(true)
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [passwordMatch, setPasswordMatch] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const passwordMeetsRequirements = useMemo(() => {
+    return /^(?=.*[A-Z])(?=.*\d).{8,}$/.test(formData.password);
+  }, [formData.password]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
 
-    // Check password match
     if (name === "confirmPassword" || name === "password") {
-      const pass = name === "password" ? value : formData.password
-      const confirm = name === "confirmPassword" ? value : formData.confirmPassword
-      setPasswordMatch(pass === confirm || confirm === "")
+      const pass = name === "password" ? value : formData.password;
+      const confirm = name === "confirmPassword" ? value : formData.confirmPassword;
+      setPasswordMatch(pass === confirm || confirm === "");
     }
-  }
+  };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!passwordMatch) return
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordMatch) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (!passwordMeetsRequirements) {
+      setError("Password must include 8+ chars, one uppercase letter, and one number.");
+      return;
+    }
 
-    setIsLoading(true)
-    // Simulate auth
-    setTimeout(() => {
-      setIsLoading(false)
-      setFormData({ fullName: "", email: "", password: "", confirmPassword: "" })
-    }, 1000)
-  }
+    setError(null);
+    setIsLoading(true);
+    try {
+      const result = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = result.user;
+
+      if (formData.fullName.trim()) {
+        await updateProfile(user, { displayName: formData.fullName.trim() });
+      }
+
+      await setDoc(
+        doc(db, "users", user.uid),
+        {
+          accountId: user.uid,
+          email: user.email,
+          fullName: formData.fullName.trim(),
+          createdAt: serverTimestamp(),
+          onboardingStatus: "registered",
+        },
+        { merge: true }
+      );
+
+      router.push(skipTagOnboarding ? "/pets" : "/onboarding/tags");
+    } catch (err: any) {
+      const message =
+        err?.code === "auth/email-already-in-use"
+          ? "An account already exists with that email."
+          : err?.message || "Failed to create account.";
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          accountId: user.uid,
+          email: user.email,
+          fullName: user.displayName ?? "",
+          createdAt: serverTimestamp(),
+          onboardingStatus: "registered",
+        });
+      }
+
+      router.push(skipTagOnboarding ? "/pets" : "/onboarding/tags");
+    } catch (err: any) {
+      setError(err?.message || "Google sign-up failed.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12" style={{ backgroundColor: '#f9f9fa' }}>
@@ -97,7 +173,9 @@ export default function RegisterPage() {
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
               />
-              <p className="text-xs text-gray-500 mt-1">At least 8 characters, 1 uppercase, 1 number</p>
+              <p className={`text-xs mt-1 ${passwordMeetsRequirements ? "text-gray-500" : "text-red-500"}`}>
+                At least 8 characters, 1 uppercase, 1 number
+              </p>
             </div>
 
             {/* Confirm Password */}
@@ -118,6 +196,13 @@ export default function RegisterPage() {
                 <p className="text-sm text-red-500 mt-1">Passwords do not match</p>
               )}
             </div>
+
+            {/* Error */}
+            {error && (
+              <div className="rounded-md bg-red-50 border border-red-200 text-red-700 px-3 py-2 text-sm">
+                {error}
+              </div>
+            )}
 
             {/* Terms */}
             <label className="flex items-start gap-2 cursor-pointer">
@@ -162,10 +247,16 @@ export default function RegisterPage() {
 
           {/* Social Login */}
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" className="border-gray-300 bg-transparent">
+            <Button
+              variant="outline"
+              className="border-gray-300 bg-transparent"
+              type="button"
+              onClick={handleGoogleSignUp}
+              disabled={isLoading}
+            >
               Google
             </Button>
-            <Button variant="outline" className="border-gray-300 bg-transparent">
+            <Button variant="outline" className="border-gray-300 bg-transparent" type="button" disabled>
               Apple
             </Button>
           </div>

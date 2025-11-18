@@ -7,53 +7,50 @@ import Link from "next/link"
 export default function PricingPage() {
   const plans = [
     {
-      name: "Basic",
-      description: "Perfect for getting started",
-      price: "Free",
+      name: "Free",
+      description: "Create your first pet profile and join the community",
+      price: "£0",
       pricePerMonth: null,
       features: [
         "1 pet profile",
         "Basic QR code generation",
-        "Pet information storage",
-        "Community access",
-        "Email support",
+        "Community sightings feed",
+        "Email notifications",
+        "Free forever",
       ],
       cta: "Get Started",
       highlighted: false,
     },
     {
-      name: "Pro",
-      description: "For pet owners who want more",
-      price: "$9.99",
+      name: "Reunite",
+      description: "Everything you need to keep your pet protected",
+      price: "£6.99",
       pricePerMonth: "per month",
       features: [
-        "Up to 5 pet profiles",
-        "Advanced QR codes with custom design",
-        "Microchip integration",
-        "Priority support",
-        "Unlimited sightings",
-        "Email & phone notifications",
-        "Sighting history analytics",
+        "Up to 3 pet profiles",
+        "Premium QR codes + 1 free dog tag",
+        "Instant SMS & email alerts",
+        "Interactive lost pet map",
+        "Priority community support",
+        "Pet status dashboard",
       ],
-      cta: "Start Free Trial",
+      cta: "Start Reunite",
       highlighted: true,
     },
     {
-      name: "Premium",
-      description: "For the ultimate pet protection",
-      price: "$19.99",
+      name: "Reunite Plus",
+      description: "Advanced tools for multi-pet households",
+      price: "£13.99",
       pricePerMonth: "per month",
       features: [
         "Unlimited pet profiles",
-        "Premium QR codes with GPS tracking",
-        "24/7 phone support",
-        "Lost pet alert system",
-        "GPS collar integration",
-        "Insurance eligibility",
-        "Priority sighting response",
-        "Pet health records storage",
+        "Custom QR codes + 3 free dog tags",
+        "Real-time location updates",
+        "24/7 lost pet hotline",
+        "Vet & medical notes storage",
+        "Dedicated success manager",
       ],
-      cta: "Start Free Trial",
+      cta: "Go Reunite Plus",
       highlighted: false,
     },
   ]
@@ -111,7 +108,7 @@ export default function PricingPage() {
                   }`}
                   style={plan.highlighted ? { backgroundColor: '#ffb067', color: 'white' } : {}}
                 >
-                  <Link href="/register">{plan.cta}</Link>
+                  <Link href={plan.name === "Free" ? "/register?plan=free" : "/register"}>{plan.cta}</Link>
                 </Button>
 
                 {/* Features */}

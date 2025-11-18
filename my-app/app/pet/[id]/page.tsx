@@ -18,7 +18,6 @@ import {
   onSnapshot,
   orderBy,
   serverTimestamp,
-  increment,
 } from "firebase/firestore";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -354,11 +353,6 @@ export default function PetProfilePage({
         mediaUrl,
         mediaType,
         parentId: null,
-        reactions: {
-          like: 0,
-          love: 0,
-          shock: 0,
-        },
         createdAt: serverTimestamp(),
       });
 
@@ -409,11 +403,6 @@ export default function PetProfilePage({
         mediaUrl,
         mediaType,
         parentId: parentUpdate.id,
-        reactions: {
-          like: 0,
-          love: 0,
-          shock: 0,
-        },
         createdAt: serverTimestamp(),
       });
 
@@ -428,27 +417,6 @@ export default function PetProfilePage({
       setIsPostingUpdate(false);
     }
   };
-
-  const handleReaction = async (
-    updateId: string,
-    reaction: "like" | "love" | "shock"
-  ) => {
-    try {
-      const updateRef = doc(db, "petUpdates", updateId);
-      await updateDoc(updateRef, {
-        [`reactions.${reaction}`]: increment(1),
-      });
-    } catch (error) {
-      console.error("Error adding reaction:", error);
-      alert("Failed to register reaction. Please try again.");
-    }
-  };
-
-  const reactionOptions = [
-    { type: "like" as const, label: "Like", icon: "👍" },
-    { type: "love" as const, label: "Love", icon: "❤️" },
-    { type: "shock" as const, label: "Shock", icon: "😮" },
-  ];
 
   const threadedUpdates = useMemo(() => {
     if (!updates.length) return [];
@@ -495,7 +463,6 @@ export default function PetProfilePage({
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   const renderUpdateThread = (update: any, depth = 0): React.ReactNode => {
-    const reactions = update.reactions || {};
     const paddingLeft = depth ? depth * 20 : 0;
     return (
       <div key={update.id} style={{ marginLeft: paddingLeft }}>
@@ -535,17 +502,6 @@ export default function PetProfilePage({
             />
           )}
           <div className="flex flex-wrap items-center gap-2">
-            {reactionOptions.map((reaction) => (
-              <Button
-                key={`${update.id}-${reaction.type}`}
-                variant="ghost"
-                size="sm"
-                onClick={() => handleReaction(update.id, reaction.type)}
-              >
-                {reaction.icon} {reaction.label} (
-                {reactions?.[reaction.type] || 0})
-              </Button>
-            ))}
             <Button
               variant="ghost"
               size="sm"
@@ -763,18 +719,18 @@ export default function PetProfilePage({
         {/* Pet Image - Full width at top */}
         <div className="relative mb-8">
           {pet.image ? (
-            <>
+            <div className="w-full bg-gray-100 rounded-xl shadow-lg overflow-hidden flex items-center justify-center py-8">
               <img
                 src={pet.image}
                 alt={pet.name}
-                className="w-full h-96 object-cover rounded-xl shadow-lg"
+                className="max-w-full max-h-[600px] w-auto h-auto object-contain rounded-lg"
               />
               {pet.isMissing && (
-                <div className="absolute top-4 left-4 bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-lg shadow-lg">
+                <div className="absolute top-4 left-4 bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-lg shadow-lg z-10">
                   Missing
                 </div>
               )}
-            </>
+            </div>
           ) : (
             <div
               className="w-full h-96 rounded-xl flex items-center justify-center text-6xl relative"
